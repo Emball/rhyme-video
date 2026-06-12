@@ -272,16 +272,31 @@ if(window.SYLDICT){
 }
 
 function splitSyllables(word) {
-  const clean = word.toLowerCase().replace(/[^a-z]/g,'');
-  if (syllDict && syllDict[clean]) {
-    const positions = syllDict[clean];
-    const syls = [];
-    let prev = 0;
-    for (const p of positions) { syls.push(word.slice(prev, p)); prev = p; }
-    syls.push(word.slice(prev));
-    return syls.filter(s => s.length > 0);
+  if (!syllDict) return [word];
+  const clean = word.toLowerCase().replace(/[^a-z']/g,'');
+  // Try lookup candidates in order
+  const base = clean.replace(/'+$/, '');
+  const candidates = [clean, base, base+'g', base+'ing'];
+  let positions = null;
+  for (const c of candidates) {
+    if (syllDict[c]) { positions = syllDict[c]; break; }
   }
-  return [word];
+  if (!positions) return [word];
+  // Map split positions from candidate back onto original word
+  // Positions index into the alpha-only base; map back to original chars
+  const syls = [];
+  let prev = 0;
+  // Build a char map: original index -> alpha-only index
+  const alphaIdx = [];
+  for (let i = 0; i < word.length; i++) {
+    if (/[a-z']/i.test(word[i])) alphaIdx.push(i);
+  }
+  for (const p of positions) {
+    const origPos = alphaIdx[p] !== undefined ? alphaIdx[p] : word.length;
+    if (origPos > prev) { syls.push(word.slice(prev, origPos)); prev = origPos; }
+  }
+  syls.push(word.slice(prev));
+  return syls.filter(s => s.length > 0);
 }
 
 // ── Persistence ──
