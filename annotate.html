@@ -126,8 +126,8 @@ kbd{display:inline-block;background:var(--surface2);border:1px solid var(--borde
 
 /* Inline color picker */
 .color-popup{
-  position:absolute;
-  z-index:200;
+  position:fixed;
+  z-index:9999;
   background:#1a1a1a;
   border:1px solid #3a3a3a;
   border-radius:8px;
@@ -137,8 +137,6 @@ kbd{display:inline-block;background:var(--surface2);border:1px solid var(--borde
   gap:6px;
   width:188px;
   box-shadow:0 8px 24px rgba(0,0,0,.6);
-  top:calc(100% + 6px);
-  left:0;
 }
 .color-popup.open{display:flex}
 .cp-swatch{
@@ -273,20 +271,13 @@ function splitSyllables(word) {
   const clean = word.toLowerCase().replace(/[^a-z]/g,'');
   if (syllDict && syllDict[clean]) {
     const positions = syllDict[clean];
-    const parts = [];
-    let prev = 0;
-    for (const p of positions) { parts.push(word.slice(prev,prev+(p-prev<0?0:p))); prev=p; }
-    // rebuild preserving original case/punctuation
     const syls = [];
-    let ci = 0;
-    for (let i=0;i<positions.length;i++){
-      syls.push(word.slice(ci,positions[i]));
-      ci=positions[i];
-    }
-    syls.push(word.slice(ci));
-    return syls.filter(s=>s.length>0);
+    let prev = 0;
+    for (const p of positions) { syls.push(word.slice(prev, p)); prev = p; }
+    syls.push(word.slice(prev));
+    return syls.filter(s => s.length > 0);
   }
-  return [word]; // fallback: whole word
+  return [word];
 }
 
 // ── Persistence ──
@@ -507,9 +498,14 @@ function openColorPopup(sylEl,token,si,song){
   });
   popup.appendChild(clr);
 
-  // Position relative to syllable span
-  sylEl.style.position='relative';
-  sylEl.appendChild(popup);
+  // Attach to body, position below syllable span
+  document.body.appendChild(popup);
+  const r=sylEl.getBoundingClientRect();
+  let top=r.bottom+6, left=r.left;
+  if(left+188>window.innerWidth) left=window.innerWidth-196;
+  if(top+200>window.innerHeight) top=r.top-206;
+  popup.style.top=top+'px';
+  popup.style.left=left+'px';
   openPopup=popup;
 
   // Close on outside click
@@ -521,6 +517,26 @@ function openColorPopup(sylEl,token,si,song){
 function closePopup(){
   if(openPopup){openPopup.remove();openPopup=null;}
 }
+
+// Manual text selection → color picker for unknown/single-syl words
+document.getElementById('lines-container').addEventListener('mouseup', e => {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  const text = sel.toString().trim();
+  if (!text) return;
+  // Find which syl span the selection anchor is in
+  const anchor = sel.anchorNode?.parentElement?.closest('.syl');
+  if (!anchor) { sel.removeAllRanges(); return; }
+  // Only trigger on single-syl words (whole word is one span)
+  const wrap = anchor.closest('.word-wrap');
+  if (!wrap || wrap.querySelectorAll('.syl').length > 1) { sel.removeAllRanges(); return; }
+  const song = getSong(); if (!song) return;
+  const li = parseInt(wrap.dataset.li), wi = parseInt(wrap.dataset.wi);
+  const token = song.tokens.find(t => t.lineIdx===li && t.wordIdx===wi);
+  if (!token) return;
+  sel.removeAllRanges();
+  openColorPopup(anchor, token, 0, song);
+});
 
 function refreshWord(wrapEl,token,song){
   if(!wrapEl)return;
