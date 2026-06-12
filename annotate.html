@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rhyme Annotator</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #111111;
+    --surface: #1a1a1a;
+    --surface2: #222222;
+    --border: #2e2e2e;
+    --text: #e8e8e8;
+    --text-dim: #666;
+    --text-muted: #444;
+    --accent: #ffffff;
+    --font-ui: 'Space Grotesk', sans-serif;
+    --font-lyrics: 'IBM Plex Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .song-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  select, input[type="text"] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    outline: none;
+  }
+
+  select:focus, input[type="text"]:focus {
+    border-color: #555;
+  }
+
+  button {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+    white-space: nowrap;
+  }
+
+  button:hover { background: #2a2a2a; border-color: #444; }
+  button.primary { background: #e8e8e8; color: #111; border-color: #e8e8e8; }
+  button.primary:hover { background: #fff; }
+  button.danger { border-color: #5a2020; color: #e06060; }
+  button.danger:hover { background: #2a1515; }
+
+  /* ── Layout ── */
+  .workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 240px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .sidebar-section {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  .song-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+  }
+
+  .song-item {
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    color: var(--text-dim);
+    transition: all 0.1s;
+  }
+
+  .song-item:hover { background: var(--surface2); color: var(--text); }
+  .song-item.active { border-left-color: #e8e8e8; color: var(--text); background: var(--surface2); }
+
+  .song-item .song-title { font-weight: 500; font-size: 13px; }
+  .song-item .song-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .new-song-form {
+    padding: 10px 16px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .new-song-form input {
+    width: 100%;
+    font-size: 12px;
+  }
+
+  /* ── Main editor ── */
+  .editor-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  /* ── Lyrics pane ── */
+  .lyrics-pane {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 40px;
+  }
+
+  .lyrics-input-area {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .lyrics-input-area textarea {
+    width: 100%;
+    max-width: 700px;
+    height: 300px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-lyrics);
+    font-size: 15px;
+    line-height: 1.8;
+    padding: 16px;
+    border-radius: 6px;
+    resize: vertical;
+    outline: none;
+  }
+
+  .lyrics-input-area textarea:focus { border-color: #444; }
+
+  /* ── Rendered lyrics ── */
+  .lyrics-rendered {
+    max-width: 700px;
+    display: none;
+  }
+
+  .lyric-line {
+    font-family: var(--font-lyrics);
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 2.2;
+    margin-bottom: 2px;
+    user-select: none;
+  }
+
+  .lyric-line.blank {
+    height: 12px;
+    margin-bottom: 0;
+  }
+
+  /* Each token = one rendered unit (word or punctuation cluster) */
+  .token {
+    display: inline;
+    cursor: pointer;
+    border-radius: 3px;
+    padding: 1px 0;
+    position: relative;
+  }
+
+  /* Sub-spans within a token */
+  .subspan {
+    display: inline;
+    border-radius: 3px;
+    padding: 2px 1px;
+    cursor: pointer;
+    transition: filter 0.1s;
+  }
+
+  .subspan:hover { filter: brightness(1.15); }
+  .subspan.selected { outline: 2px solid white; outline-offset: 1px; }
+  .subspan.highlighted { }
+
+  /* ── Color palette strip ── */
+  .palette-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .palette-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 500;
+    margin-right: 4px;
+  }
+
+  .color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.1s, border-color 0.1s;
+    flex-shrink: 0;
+  }
+
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.active { border-color: white; transform: scale(1.15); }
+
+  .palette-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    margin: 0 4px;
+  }
+
+  .clear-btn-small {
+    font-size: 11px;
+    padding: 4px 10px;
+    color: #e06060;
+    border-color: #5a2020;
+  }
+
+  /* ── Status bar ── */
+  .statusbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 6px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 11px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+
+  .status-item { display: flex; align-items: center; gap: 5px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #3a3a3a; }
+  .status-dot.active { background: #4caf7d; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    width: 480px;
+    max-width: 90vw;
+  }
+
+  .modal h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  .modal textarea {
+    width: 100%;
+    height: 180px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-lyrics);
+    font-size: 13px;
+    line-height: 1.7;
+    padding: 12px;
+    border-radius: 4px;
+    resize: vertical;
+    outline: none;
+    margin-bottom: 12px;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  /* ── Import/Export panel ── */
+  .io-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+  .empty-state {
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 40px 0;
+    font-style: italic;
+  }
+
+  .hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .kbd {
+    display: inline-block;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 10px;
+    font-family: var(--font-lyrics);
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <span class="logo">Rhyme Annotator</span>
+  <div class="io-row">
+    <button onclick="importAlignment()">Load alignment.json</button>
+    <button onclick="exportAnnotation()" class="primary">Export annotation.json</button>
+  </div>
+</header>
+
+<div class="workspace">
+
+  <!-- Sidebar: Song Manager -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Songs</div>
+    </div>
+    <div class="new-song-form">
+      <input type="text" id="new-song-title" placeholder="Song title..." />
+      <button onclick="addSong()" class="primary">+ New Song</button>
+    </div>
+    <div class="song-list" id="song-list"></div>
+  </aside>
+
+  <!-- Main editor -->
+  <div class="editor-area">
+
+    <div class="editor-toolbar" id="editor-toolbar">
+      <span class="toolbar-label" id="song-name-label">No song selected</span>
+      <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+        <span class="hint"><kbd class="kbd">click</kbd> select span &nbsp; <kbd class="kbd">drag</kbd> range &nbsp; <kbd class="kbd">esc</kbd> deselect</span>
+        <button onclick="openLyricsModal()" id="edit-lyrics-btn" disabled>Edit Lyrics</button>
+        <button onclick="clearAllHighlights()" class="danger" id="clear-btn" disabled>Clear All</button>
+      </div>
+    </div>
+
+    <div class="lyrics-pane" id="lyrics-pane">
+      <div class="empty-state" id="empty-state">Select a song or create a new one to begin.</div>
+      <div class="lyrics-input-area" id="lyrics-input-area" style="display:none;">
+        <textarea id="lyrics-textarea" placeholder="Paste lyrics here...&#10;&#10;Each line becomes a lyric line.&#10;Blank lines add spacing."></textarea>
+        <button class="primary" onclick="commitLyrics()">Set Lyrics</button>
+      </div>
+      <div class="lyrics-rendered" id="lyrics-rendered"></div>
+    </div>
+
+    <!-- Palette bar -->
+    <div class="palette-bar" id="palette-bar">
+      <span class="palette-label">Color</span>
+      <div id="swatches"></div>
+      <div class="palette-divider"></div>
+      <button class="clear-btn-small" onclick="clearSelection()">Clear selection</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Status bar -->
+<div class="statusbar">
+  <div class="status-item">
+    <div class="status-dot" id="align-dot"></div>
+    <span id="align-status">No alignment loaded</span>
+  </div>
+  <div class="status-item" style="margin-left:auto;">
+    <span id="span-count">0 spans annotated</span>
+  </div>
+</div>
+
+<!-- Lyrics edit modal -->
+<div class="modal-overlay" id="lyrics-modal">
+  <div class="modal">
+    <h3>Edit Lyrics</h3>
+    <textarea id="modal-lyrics-textarea" placeholder="Paste lyrics here..."></textarea>
+    <div class="modal-actions">
+      <button onclick="closeLyricsModal()">Cancel</button>
+      <button class="primary" onclick="commitLyricsFromModal()">Update Lyrics</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Palette ──
+const PALETTE = [
+  '#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFC9', '#BAE1FF',
+  '#D7BAFF', '#FFB3F0', '#B3FFF0', '#FFC8A2', '#C9FFB3',
+  '#A2D4FF', '#FFD6A5', '#CAFFBF', '#9BF6FF', '#BDB2FF',
+  '#FFC6FF', '#FDFFB6', '#A8DADC', '#F4A261', '#90E0EF',
+];
+
+let activeColor = PALETTE[0];
+let songs = JSON.parse(localStorage.getItem('rhyme_songs') || '[]');
+let activeSongId = null;
+let alignmentData = null; // {words: [{index, text, start, end}]}
+let isDragging = false;
+let dragStartSpan = null;
+
+// ── Persistence ──
+function save() {
+  localStorage.setItem('rhyme_songs', JSON.stringify(songs));
+}
+
+function getSong() {
+  return songs.find(s => s.id === activeSongId) || null;
+}
+
+// ── Song manager ──
+function addSong() {
+  const input = document.getElementById('new-song-title');
+  const title = input.value.trim();
+  if (!title) return;
+  const song = {
+    id: Date.now().toString(),
+    title,
+    lyrics: '',
+    tokens: [], // [{lineIdx, tokenIdx, text, spans: [{charStart, charEnd, color}]}]
+  };
+  songs.push(song);
+  save();
+  input.value = '';
+  renderSongList();
+  selectSong(song.id);
+}
+
+function renderSongList() {
+  const el = document.getElementById('song-list');
+  if (!songs.length) {
+    el.innerHTML = '<div class="song-item" style="cursor:default;color:#444;font-size:12px;">No songs yet</div>';
+    return;
+  }
+  el.innerHTML = songs.map(s => `
+    <div class="song-item ${s.id === activeSongId ? 'active' : ''}" onclick="selectSong('${s.id}')">
+      <div class="song-title">${s.title}</div>
+      <div class="song-meta">${countSpans(s)} spans</div>
+    </div>
+  `).join('');
+}
+
+function countSpans(song) {
+  return song.tokens.reduce((a, t) => a + t.spans.length, 0);
+}
+
+function selectSong(id) {
+  activeSongId = id;
+  renderSongList();
+  loadSongEditor();
+}
+
+// ── Editor ──
+function loadSongEditor() {
+  const song = getSong();
+  if (!song) return;
+
+  document.getElementById('song-name-label').textContent = song.title;
+  document.getElementById('edit-lyrics-btn').disabled = false;
+  document.getElementById('clear-btn').disabled = false;
+  document.getElementById('empty-state').style.display = 'none';
+
+  if (!song.lyrics) {
+    document.getElementById('lyrics-input-area').style.display = 'flex';
+    document.getElementById('lyrics-rendered').style.display = 'none';
+    document.getElementById('lyrics-textarea').value = '';
+  } else {
+    document.getElementById('lyrics-input-area').style.display = 'none';
+    document.getElementById('lyrics-rendered').style.display = 'block';
+    renderLyrics(song);
+  }
+  updateStatusBar();
+}
+
+function commitLyrics() {
+  const song = getSong();
+  if (!song) return;
+  const text = document.getElementById('lyrics-textarea').value.trim();
+  if (!text) return;
+  song.lyrics = text;
+  song.tokens = buildTokens(text);
+  save();
+  document.getElementById('lyrics-input-area').style.display = 'none';
+  document.getElementById('lyrics-rendered').style.display = 'block';
+  renderLyrics(song);
+  updateStatusBar();
+}
+
+function openLyricsModal() {
+  const song = getSong();
+  if (!song) return;
+  document.getElementById('modal-lyrics-textarea').value = song.lyrics;
+  document.getElementById('lyrics-modal').classList.add('open');
+}
+
+function closeLyricsModal() {
+  document.getElementById('lyrics-modal').classList.remove('open');
+}
+
+function commitLyricsFromModal() {
+  const song = getSong();
+  if (!song) return;
+  const text = document.getElementById('modal-lyrics-textarea').value.trim();
+  if (!text) return;
+  song.lyrics = text;
+  song.tokens = buildTokens(text);
+  save();
+  closeLyricsModal();
+  document.getElementById('lyrics-input-area').style.display = 'none';
+  document.getElementById('lyrics-rendered').style.display = 'block';
+  renderLyrics(song);
+  updateStatusBar();
+}
+
+// ── Token builder ──
+// Splits lyrics into lines, each line into word tokens
+// Each token has a list of spans (initially one span = full word, no color)
+function buildTokens(text) {
+  const lines = text.split('\n');
+  const tokens = [];
+  let globalIdx = 0;
+  lines.forEach((line, lineIdx) => {
+    if (!line.trim()) {
+      tokens.push({ lineIdx, tokenIdx: globalIdx++, text: '', blank: true, spans: [] });
+      return;
+    }
+    // Split keeping spaces as part of preceding token for layout
+    const words = line.match(/\S+/g) || [];
+    words.forEach((word, wi) => {
+      tokens.push({
+        lineIdx,
+        tokenIdx: globalIdx++,
+        text: word,
+        blank: false,
+        spans: [], // [{charStart, charEnd, color}]
+      });
+    });
+  });
+  return tokens;
+}
+
+// ── Render lyrics ──
+function renderLyrics(song) {
+  const container = document.getElementById('lyrics-rendered');
+  container.innerHTML = '';
+
+  // Group tokens by line
+  const lines = {};
+  song.tokens.forEach(t => {
+    if (!lines[t.lineIdx]) lines[t.lineIdx] = [];
+    lines[t.lineIdx].push(t);
+  });
+
+  Object.keys(lines).sort((a,b) => a-b).forEach(lineIdx => {
+    const lineTokens = lines[lineIdx];
+    const lineEl = document.createElement('div');
+    lineEl.className = 'lyric-line';
+
+    if (lineTokens.length === 1 && lineTokens[0].blank) {
+      lineEl.className += ' blank';
+      container.appendChild(lineEl);
+      return;
+    }
+
+    lineTokens.forEach((token, ti) => {
+      if (token.blank) return;
+      const tokenEl = document.createElement('span');
+      tokenEl.className = 'token';
+      tokenEl.dataset.tokenIdx = token.tokenIdx;
+
+      renderTokenSpans(token, tokenEl);
+
+      if (ti < lineTokens.length - 1) {
+        tokenEl.innerHTML += ' ';
+      }
+
+      container.appendChild(tokenEl);
+    });
+
+    container.appendChild(lineEl);
+  });
+}
+
+function renderTokenSpans(token, tokenEl) {
+  tokenEl.innerHTML = '';
+  const text = token.text;
+
+  if (!token.spans.length) {
+    // No highlights — render as single selectable subspan
+    const sp = document.createElement('span');
+    sp.className = 'subspan';
+    sp.dataset.tokenIdx = token.tokenIdx;
+    sp.dataset.charStart = 0;
+    sp.dataset.charEnd = text.length;
+    sp.textContent = text;
+    sp.addEventListener('mousedown', onSubspanMousedown);
+    sp.addEventListener('mouseenter', onSubspanMouseenter);
+    sp.addEventListener('mouseup', onSubspanMouseup);
+    tokenEl.appendChild(sp);
+    return;
+  }
+
+  // Build character coverage map
+  // Collect all span boundaries, sort, fill gaps
+  const boundaries = new Set([0, text.length]);
+  token.spans.forEach(s => { boundaries.add(s.charStart); boundaries.add(s.charEnd); });
+  const sorted = [...boundaries].sort((a,b) => a-b);
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const cs = sorted[i], ce = sorted[i+1];
+    const chunk = text.slice(cs, ce);
+    if (!chunk) continue;
+
+    const matchSpan = token.spans.find(s => s.charStart <= cs && s.charEnd >= ce);
+    const sp = document.createElement('span');
+    sp.className = 'subspan' + (matchSpan ? ' highlighted' : '');
+    sp.dataset.tokenIdx = token.tokenIdx;
+    sp.dataset.charStart = cs;
+    sp.dataset.charEnd = ce;
+    sp.textContent = chunk;
+    if (matchSpan) sp.style.background = matchSpan.color;
+    sp.addEventListener('mousedown', onSubspanMousedown);
+    sp.addEventListener('mouseenter', onSubspanMouseenter);
+    sp.addEventListener('mouseup', onSubspanMouseup);
+    tokenEl.appendChild(sp);
+  }
+}
+
+// ── Selection & highlighting ──
+let selectionStart = null; // {tokenIdx, charStart, charEnd}
+let selectionEnd = null;
+
+function onSubspanMousedown(e) {
+  e.preventDefault();
+  isDragging = true;
+  dragStartSpan = e.currentTarget;
+  selectionStart = spanCoords(e.currentTarget);
+  selectionEnd = { ...selectionStart };
+  applyVisualSelection();
+}
+
+function onSubspanMouseenter(e) {
+  if (!isDragging) return;
+  selectionEnd = spanCoords(e.currentTarget);
+  applyVisualSelection();
+}
+
+function onSubspanMouseup(e) {
+  if (!isDragging) return;
+  isDragging = false;
+  selectionEnd = spanCoords(e.currentTarget);
+  applyVisualSelection();
+}
+
+document.addEventListener('mouseup', () => { isDragging = false; });
+
+function spanCoords(el) {
+  return {
+    tokenIdx: parseInt(el.dataset.tokenIdx),
+    charStart: parseInt(el.dataset.charStart),
+    charEnd: parseInt(el.dataset.charEnd),
+  };
+}
+
+function applyVisualSelection() {
+  // Clear previous selection markers
+  document.querySelectorAll('.subspan.selected').forEach(el => el.classList.remove('selected'));
+
+  if (!selectionStart) return;
+
+  const minToken = Math.min(selectionStart.tokenIdx, selectionEnd.tokenIdx);
+  const maxToken = Math.max(selectionStart.tokenIdx, selectionEnd.tokenIdx);
+
+  document.querySelectorAll('.subspan').forEach(el => {
+    const ti = parseInt(el.dataset.tokenIdx);
+    if (ti >= minToken && ti <= maxToken) el.classList.add('selected');
+  });
+}
+
+function applyColorToSelection() {
+  if (!selectionStart || !activeColor) return;
+  const song = getSong();
+  if (!song) return;
+
+  const minToken = Math.min(selectionStart.tokenIdx, selectionEnd ? selectionEnd.tokenIdx : selectionStart.tokenIdx);
+  const maxToken = Math.max(selectionStart.tokenIdx, selectionEnd ? selectionEnd.tokenIdx : selectionStart.tokenIdx);
+
+  song.tokens.forEach(token => {
+    if (token.tokenIdx < minToken || token.tokenIdx > maxToken) return;
+
+    let cs = 0, ce = token.text.length;
+
+    // For the boundary tokens within a word, use the actual char ranges
+    if (token.tokenIdx === selectionStart.tokenIdx && selectionStart.tokenIdx === selectionEnd?.tokenIdx) {
+      cs = Math.min(selectionStart.charStart, selectionEnd?.charStart ?? selectionStart.charStart);
+      ce = Math.max(selectionStart.charEnd, selectionEnd?.charEnd ?? selectionStart.charEnd);
+    }
+
+    // Merge/add span — remove any existing overlapping spans first
+    token.spans = token.spans.filter(s => s.charEnd <= cs || s.charStart >= ce);
+    token.spans.push({ charStart: cs, charEnd: ce, color: activeColor });
+    token.spans.sort((a,b) => a.charStart - b.charStart);
+
+    // Re-render this token
+    const tokenEl = document.querySelector(`.token[data-token-idx="${token.tokenIdx}"]`);
+    if (tokenEl) renderTokenSpans(token, tokenEl);
+  });
+
+  save();
+  clearSelection();
+  updateStatusBar();
+  renderSongList();
+}
+
+function clearSelection() {
+  selectionStart = null;
+  selectionEnd = null;
+  document.querySelectorAll('.subspan.selected').forEach(el => el.classList.remove('selected'));
+}
+
+function clearAllHighlights() {
+  const song = getSong();
+  if (!song) return;
+  if (!confirm('Clear all highlights for this song?')) return;
+  song.tokens.forEach(t => t.spans = []);
+  save();
+  renderLyrics(song);
+  updateStatusBar();
+  renderSongList();
+}
+
+// ── Palette ──
+function buildPalette() {
+  const container = document.getElementById('swatches');
+  container.style.display = 'flex';
+  container.style.gap = '6px';
+  container.style.flexWrap = 'wrap';
+  container.innerHTML = PALETTE.map((c, i) => `
+    <div class="color-swatch ${i === 0 ? 'active' : ''}"
+         style="background:${c}"
+         title="${c}"
+         onclick="setColor('${c}', this)">
+    </div>
+  `).join('');
+}
+
+function setColor(color, el) {
+  activeColor = color;
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  // If there's a selection, apply immediately
+  if (selectionStart) applyColorToSelection();
+}
+
+// Click on a swatch also applies to current selection
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') clearSelection();
+  if (e.key === 'Enter' && selectionStart) applyColorToSelection();
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    // Remove highlight from selected spans
+    removeHighlightFromSelection();
+  }
+});
+
+function removeHighlightFromSelection() {
+  if (!selectionStart) return;
+  const song = getSong();
+  if (!song) return;
+
+  const minToken = Math.min(selectionStart.tokenIdx, selectionEnd ? selectionEnd.tokenIdx : selectionStart.tokenIdx);
+  const maxToken = Math.max(selectionStart.tokenIdx, selectionEnd ? selectionEnd.tokenIdx : selectionStart.tokenIdx);
+
+  song.tokens.forEach(token => {
+    if (token.tokenIdx < minToken || token.tokenIdx > maxToken) return;
+    token.spans = [];
+    const tokenEl = document.querySelector(`.token[data-token-idx="${token.tokenIdx}"]`);
+    if (tokenEl) renderTokenSpans(token, tokenEl);
+  });
+
+  save();
+  clearSelection();
+  updateStatusBar();
+  renderSongList();
+}
+
+// ── Alignment import ──
+function importAlignment() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        alignmentData = JSON.parse(ev.target.result);
+        document.getElementById('align-dot').classList.add('active');
+        document.getElementById('align-status').textContent = `Alignment loaded: ${alignmentData.words?.length || 0} words`;
+      } catch {
+        alert('Invalid alignment.json');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// ── Annotation export ──
+function exportAnnotation() {
+  const song = getSong();
+  if (!song) { alert('No song selected.'); return; }
+
+  // Build flat list of annotated spans with word_index, char_start, char_end, color
+  const spans = [];
+  song.tokens.forEach(token => {
+    token.spans.forEach(s => {
+      spans.push({
+        word_index: token.tokenIdx,
+        word_text: token.text,
+        char_start: s.charStart,
+        char_end: s.charEnd,
+        color: s.color,
+      });
+    });
+  });
+
+  const output = {
+    song: song.title,
+    exported_at: new Date().toISOString(),
+    spans,
+  };
+
+  if (alignmentData) output.alignment_ref = true;
+
+  const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${song.title.replace(/\s+/g, '_')}_annotation.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Status bar ──
+function updateStatusBar() {
+  const song = getSong();
+  const count = song ? countSpans(song) : 0;
+  document.getElementById('span-count').textContent = `${count} span${count !== 1 ? 's' : ''} annotated`;
+}
+
+// ── Init ──
+buildPalette();
+renderSongList();
+</script>
+</body>
+</html>
