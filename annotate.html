@@ -259,10 +259,15 @@ let syllDict = null;
 let openPopup = null; // currently open color popup element
 
 // ── Load syllable dictionary ──
-fetch('syllable_dict.json')
-  .then(r=>r.json())
-  .then(d=>{syllDict=d;console.log(`Syllable dict: ${Object.keys(d).length} entries`)})
-  .catch(()=>console.warn('syllable_dict.json not found, using fallback'));
+if(window.SYLDICT){
+  syllDict=window.SYLDICT;
+  console.log(`Syllable dict (inline): ${Object.keys(syllDict).length} entries`);
+} else {
+  fetch('syllable_dict.json')
+    .then(r=>r.json())
+    .then(d=>{syllDict=d;console.log(`Syllable dict: ${Object.keys(d).length} entries`)})
+    .catch(()=>console.warn('syllable_dict.json not found, using fallback'));
+}
 
 function splitSyllables(word) {
   const clean = word.toLowerCase().replace(/[^a-z]/g,'');
